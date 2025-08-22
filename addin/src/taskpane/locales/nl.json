@@ -1,0 +1,13 @@
+{
+  "app.title": "AI Mail assistant",
+  "button.process": "E-mail verwerken",
+  "button.process_stream": "E-mail verwerken (stream)",
+  "button.insert_reply": "Als antwoord invoegen",
+  "button.test_connection": "Verbinding testen",
+  "label.summary": "Samenvatting",
+  "label.action_items": "Actiepunten",
+  "label.draft_reply": "Conceptantwoord",
+  "label.diagnostics": "Diagnostiek"
+}
+
+

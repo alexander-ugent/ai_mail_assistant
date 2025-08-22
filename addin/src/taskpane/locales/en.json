@@ -1,0 +1,13 @@
+{
+  "app.title": "AI Mail assistant",
+  "button.process": "Process Email",
+  "button.process_stream": "Process Email (stream)",
+  "button.insert_reply": "Insert as Reply",
+  "button.test_connection": "Test Connection",
+  "label.summary": "Summary",
+  "label.action_items": "Action Items",
+  "label.draft_reply": "Draft Reply",
+  "label.diagnostics": "Diagnostics"
+}
+
+

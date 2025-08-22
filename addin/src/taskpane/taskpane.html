@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Mail assistant</title>
+    <link rel="stylesheet" href="taskpane.css" />
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  </head>
+  <body>
+    <header>
+      <img src="../../assets/icon-32.png" alt="AI Mail assistant" />
+      <h1>AI Mail assistant</h1>
+    </header>
+
+    <section class="controls">
+      <button id="process-email">Process Email</button>
+      <button id="process-email-stream">Process Email (stream)</button>
+      <button id="insert-reply">Insert as Reply</button>
+      <button id="test-connection">Test Connection</button>
+    </section>
+
+    <section id="status"></section>
+
+    <section class="results">
+      <div class="card">
+        <h2>Summary</h2>
+        <div id="summary"></div>
+      </div>
+      <div class="card">
+        <h2>Action Items</h2>
+        <ul id="action-items"></ul>
+      </div>
+      <div class="card">
+        <h2>Draft Reply</h2>
+        <div id="draft-reply"></div>
+      </div>
+    </section>
+
+    <section class="diagnostics">
+      <h2>Diagnostics</h2>
+      <pre id="diagnostics"></pre>
+    </section>
+
+    <script src="taskpane.js"></script>
+  </body>
+</html>
+
+
