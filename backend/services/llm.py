@@ -7,7 +7,7 @@ import asyncio
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 
-class LlmClient:
+class LLMClient:
     """Abstract LLM client interface."""
 
     def generate(self, email: Dict[str, Any], documents: List[Dict[str, Any]], *, include_citations: bool = True) -> Dict[str, Any]:
@@ -17,7 +17,7 @@ class LlmClient:
         raise NotImplementedError
 
 
-class MockLlmClient(LlmClient):
+class MockLLMClient(LLMClient):
     """Deterministic mock LLM for local development."""
 
     def generate(self, email: Dict[str, Any], documents: List[Dict[str, Any]], *, include_citations: bool = True) -> Dict[str, Any]:
@@ -49,7 +49,7 @@ class MockLlmClient(LlmClient):
             f"<p>Thanks for your email regarding <strong>{subject}</strong>. "
             f"Here's a quick recap and next steps:</p>\n"
             f"<ul>" + ''.join(f"<li>{item}</li>" for item in action_items[:5]) + "</ul>\n"
-            f"<p>Best regards,<br/>AI Mail assistant</p>"
+            f"<p>Best regards,<br/>AI Mail Assistant</p>"
         )
 
         return {
@@ -64,7 +64,7 @@ class MockLlmClient(LlmClient):
         # Stream a canned message token-by-token
         text = (
             f"Hi, Thanks for your email about {email.get('subject', '(no subject)')}. "
-            f"I'll follow up shortly with next steps. Best, AI Mail assistant"
+            f"I'll follow up shortly with next steps. Best, AI Mail Assistant"
         )
         for token in text.split(' '):
             await asyncio.sleep(0.03)
@@ -78,7 +78,7 @@ def _build_prompt(email: Dict[str, Any], documents: List[Dict[str, Any]]) -> str
         f"- {d.get('title', 'doc')}: {d.get('snippet', '')[:200]}" for d in (documents or [])
     )
     prompt = (
-        "You are an assistant that processes an email and returns a strict JSON object. "
+        "You are an Assistant that processes an email and returns a strict JSON object. "
         "Respond with ONLY valid JSON, no code fences. Schema: {\n"
         "  \"summary\": string,\n"
         "  \"action_items\": string[],\n"
@@ -125,7 +125,7 @@ def _parse_generation_to_result(text: str) -> Dict[str, Any]:
     }
 
 
-class GeminiLlmClient(LlmClient):
+class GeminiLLMClient(LLMClient):
     def __init__(self, model_name: Optional[str] = None) -> None:
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
@@ -136,7 +136,7 @@ class GeminiLlmClient(LlmClient):
             raise RuntimeError("google-generativeai is not installed. Add it to requirements.") from e
         genai.configure(api_key=api_key)
         self._genai = genai
-        self._model_name = model_name or os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+        self._model_name = model_name or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
     def generate(self, email: Dict[str, Any], documents: List[Dict[str, Any]], *, include_citations: bool = True) -> Dict[str, Any]:
         prompt = _build_prompt(email, documents)
@@ -172,61 +172,17 @@ class GeminiLlmClient(LlmClient):
                 if t:
                     yield t + " "
 
-
-class GroqLlmClient(LlmClient):
-    def __init__(self, model_name: Optional[str] = None) -> None:
-        api_key = os.getenv("GROQ_API_KEY")
-        if not api_key:
-            raise RuntimeError("GROQ_API_KEY is not set")
-        try:
-            from groq import Groq  # type: ignore
-        except Exception as e:
-            raise RuntimeError("groq is not installed. Add it to requirements.") from e
-        self._client = Groq(api_key=api_key)
-        self._model_name = model_name or os.getenv("GROQ_MODEL", "llama-3.1-70b-versatile")
-
-    def _messages(self, prompt: str) -> List[Dict[str, str]]:
-        return [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": prompt}]
-
-    def generate(self, email: Dict[str, Any], documents: List[Dict[str, Any]], *, include_citations: bool = True) -> Dict[str, Any]:
-        prompt = _build_prompt(email, documents)
-        resp = self._client.chat.completions.create(
-            model=self._model_name,
-            messages=self._messages(prompt),
-            temperature=0.2,
-        )
-        text = resp.choices[0].message.content or ""
-        result = _parse_generation_to_result(text)
-        result.setdefault("debug", {})["provider"] = "groq"
-        result.setdefault("debug", {})["model"] = self._model_name
-        return result
-
-    async def astream(self, email: Dict[str, Any], documents: List[Dict[str, Any]], *, include_citations: bool = True) -> AsyncIterator[str]:
-        prompt = _build_prompt(email, documents)
-        stream = self._client.chat.completions.create(
-            model=self._model_name,
-            messages=self._messages(prompt),
-            temperature=0.2,
-            stream=True,
-        )
-        for chunk in stream:
-            delta = getattr(chunk.choices[0], "delta", None)
-            if delta and getattr(delta, "content", None):
-                for t in delta.content.split(" "):
-                    if t:
-                        yield t + " "
-            await asyncio.sleep(0)
-
-
-def get_llm(provider: str = "mock", model_name: Optional[str] = None) -> LlmClient:
-    provider = (provider or os.getenv("LLM_PROVIDER", "mock")).lower()
+def get_llm(provider: str = "mock", model_name: Optional[str] = None) -> LLMClient:
+    # Prefer explicit provider; fall back to env; if GEMINI_API_KEY is present, default to gemini
+    env_provider = os.getenv("LLM_PROVIDER")
+    if not provider and not env_provider and os.getenv("GEMINI_API_KEY"):
+        provider = "gemini"
+    provider = (provider or env_provider or "mock").lower()
     if provider == "mock":
-        return MockLlmClient()
+        return MockLLMClient()
     if provider in {"gemini", "google", "googleai"}:
-        return GeminiLlmClient(model_name=model_name)
-    if provider == "groq":
-        return GroqLlmClient(model_name=model_name)
+        return GeminiLLMClient(model_name=model_name)
     # Default to mock with hint
-    return MockLlmClient()
+    return MockLLMClient()
 
 

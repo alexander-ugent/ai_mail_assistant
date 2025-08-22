@@ -2,6 +2,8 @@ import os
 import time
 import json
 from typing import Any, AsyncIterator, Dict, List, Optional
+import logging
+from dotenv import load_dotenv, find_dotenv
 
 from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +13,10 @@ from pydantic import BaseModel, Field
 from services.llm import get_llm
 from services.email_processor import process_email_non_streaming, process_email_streaming
 
+# Load environment variables from a local .env file (if present)
+# Search upwards so running from project root or backend/ both work.
+load_dotenv(find_dotenv(), override=False)
+
 
 class ProcessEmailRequest(BaseModel):
     email_id: Optional[str] = None
@@ -18,7 +24,7 @@ class ProcessEmailRequest(BaseModel):
     body: str = Field(..., description="Email body, HTML or plain text")
     recipients: Optional[List[str]] = None
     enable_context: bool = False
-    provider: str = Field(default="mock")
+    provider: Optional[str] = None  # If omitted, backend will use LLM_PROVIDER from env (defaults to mock)
     model_name: Optional[str] = None
 
 
@@ -30,7 +36,24 @@ class ProcessEmailResponse(BaseModel):
     debug: Dict[str, Any] = {}
 
 
-app = FastAPI(title="AI Mail assistant API", description="Local-first API with mock LLM")
+# Configure module logger (INFO by default)
+logger = logging.getLogger("ai_mail_assistant")
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter("%(levelname)s:%(name)s:%(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+
+# Log key environment selections at startup
+logger.info(
+    "startup env LLM_PROVIDER=%s GEMINI_MODEL=%s has_key=%s",
+    os.getenv("LLM_PROVIDER"),
+    os.getenv("GEMINI_MODEL"),
+    bool(os.getenv("GEMINI_API_KEY")),
+)
+
+app = FastAPI(title="AI Mail Assistant API", description="Local-first API with mock LLM")
 
 origins = [
     "https://localhost:3000",
@@ -48,12 +71,27 @@ app.add_middleware(
 
 @app.get("/health")
 async def health() -> Dict[str, str]:
-    return {"status": "ok", "app": "AI Mail assistant"}
+    return {"status": "ok", "app": "AI Mail Assistant"}
 
 
 @app.post("/api/v1/process_email_for_addin", response_model=ProcessEmailResponse)
 async def process_email_for_addin(payload: ProcessEmailRequest = Body(...)) -> ProcessEmailResponse:
-    llm = get_llm(provider=payload.provider, model_name=payload.model_name)
+    env_provider = os.getenv("LLM_PROVIDER")  # no default; allow GEMINI_API_KEY fallback
+    selected_input = payload.provider or env_provider
+    # Determine effective provider for logging/UI
+    if not selected_input and os.getenv("GEMINI_API_KEY"):
+        effective_provider = "gemini"
+    else:
+        effective_provider = (selected_input or "mock").lower()
+    selected_model = payload.model_name or (os.getenv("GEMINI_MODEL") if effective_provider == "gemini" else None)
+    logger.info(
+        "process_email provider_effective=%s model=%s payload_provider=%s env_provider=%s",
+        effective_provider,
+        selected_model,
+        payload.provider,
+        env_provider,
+    )
+    llm = get_llm(provider=(selected_input or ""), model_name=selected_model)
     result = process_email_non_streaming(
         llm=llm,
         email={"subject": payload.subject, "body": payload.body, "recipients": payload.recipients or []},
@@ -68,10 +106,24 @@ def _sse_format(event: str, data: Dict[str, Any]) -> bytes:
 
 @app.post("/api/v1/process_email_for_addin_stream")
 async def process_email_for_addin_stream(payload: ProcessEmailRequest = Body(...)) -> StreamingResponse:
-    llm = get_llm(provider=payload.provider, model_name=payload.model_name)
+    env_provider = os.getenv("LLM_PROVIDER")
+    selected_input = payload.provider or env_provider
+    if not selected_input and os.getenv("GEMINI_API_KEY"):
+        effective_provider = "gemini"
+    else:
+        effective_provider = (selected_input or "mock").lower()
+    selected_model = payload.model_name or (os.getenv("GEMINI_MODEL") if effective_provider == "gemini" else None)
+    logger.info(
+        "process_email_stream provider_effective=%s model=%s payload_provider=%s env_provider=%s",
+        effective_provider,
+        selected_model,
+        payload.provider,
+        env_provider,
+    )
+    llm = get_llm(provider=(selected_input or ""), model_name=selected_model)
 
     async def streamer() -> AsyncIterator[bytes]:
-        yield _sse_format("status_update", {"message": "initialising LLM agent"})
+        yield _sse_format("status_update", {"message": f"initialising LLM agent ({effective_provider}{(':'+selected_model) if selected_model else ''})"})
         async for chunk in process_email_streaming(
             llm=llm,
             email={"subject": payload.subject, "body": payload.body, "recipients": payload.recipients or []},

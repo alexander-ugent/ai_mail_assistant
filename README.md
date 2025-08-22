@@ -1,8 +1,8 @@
-# AI Mail assistant
+# AI Mail Assistant
 
 Local-first Outlook add-in that processes emails using a mock LLM. No external keys required. You can later swap to a real LLM by extending the backend `services/llm.py` factory.
 
-## AI Mail assistant – Local setup and sideload guide
+## AI Mail Assistant – Local setup and sideload guide
 
 ### Prerequisites
 - Node.js (LTS) and npm
@@ -28,6 +28,20 @@ uvicorn app:app --reload --port 8000 \
 #   curl -k https://localhost:8000/health
 ```
 
+Backend reads environment variables from `backend/.env` (auto‑loaded via python-dotenv). Create this file to keep keys local (no shell profile edits needed). If `GEMINI_API_KEY` is set and `LLM_PROVIDER` is omitted, the backend defaults to Gemini with `gemini-2.5-flash`:
+```bash
+cat > backend/.env << 'EOF'
+# LLM provider selection: mock | gemini (optional when GEMINI_API_KEY is set)
+# LLM_PROVIDER=gemini
+
+# Gemini (Google AI Studio)
+GEMINI_API_KEY=
+# Default model if not set: gemini-2.5-flash
+GEMINI_MODEL=gemini-2.5-flash
+
+EOF
+```
+
 ### 2) Frontend (taskpane) – serve over HTTPS on https://localhost:3000
 ```bash
 # Serve from addin root so assets resolve
@@ -39,7 +53,7 @@ http-server -p 3000 --ssl \
 
 ### 3) Configure the manifest (if needed)
 - Ensure `addin/manifest/manifest.xml`:
-  - Name is “AI Mail assistant”
+  - Name is “AI Mail Assistant”
   - Taskpane URL points to `https://localhost:3000/src/taskpane/taskpane.html`
   - Icons point to your `assets/` paths
 - In `addin/src/taskpane/taskpane.js`, set:
@@ -53,7 +67,7 @@ http-server -p 3000 --ssl \
 
 ### 5) Test the end‑to‑end flow
 - Open an email in Outlook
-- Open “AI Mail assistant” from the ribbon
+- Open “AI Mail Assistant” from the ribbon
 - Click “Test Connection” → should show “Backend: ok”
 - Click “Process Email” → Summary, Action Items, and Draft appear
 - Click “Process Email (stream)” → Draft text streams in
@@ -64,38 +78,46 @@ http-server -p 3000 --ssl \
 - CORS: backend must allow `https://localhost:3000` (already configured in `backend/app.py`)
 - No email selected: open a message and reopen the taskpane
 - Outlook Desktop sometimes caches manifests; remove and re-add the add-in after changes
+- Browser trust for dev certs: open these URLs in the SAME browser you use for Outlook Web and click “Advanced → Continue” to trust them once:
+  - `https://localhost:3000/src/taskpane/taskpane.html`
+  - `https://localhost:3000/assets/favicon-32x32.png` (or any asset)
+  - `https://localhost:8000/health`
+  - Tip (Firefox): set `about:config → security.enterprise_roots.enabled = true`, or import `~/.office-addin-dev-certs/ca.crt` under Certificates → Authorities.
 
 ### Switching to a real LLM later
 - Keep the mock LLM for local dev
 - Implement provider(s) in `backend/services/llm.py` and wire via env (e.g., `LLM_PROVIDER=openai`)
 - No changes required in the add-in UI or API contracts
 
-### External LLM providers (Gemini, Groq)
-You can enable hosted LLMs without changing the UI by choosing a provider via env vars. The backend handles the call and returns the same response schema.
+### External LLM provider (Gemini)
+You can enable a hosted LLM without changing the UI by choosing `gemini` via env vars. The backend handles the call and returns the same response schema.
 
-Supported providers out of the box:
+Supported providers:
 - `mock` (default, no API key)
 - `gemini` (Google Generative AI)
-- `groq` (Groq API with open-models like Llama 3)
 
 Setup:
 1) Install deps (already in `backend/requirements.txt`):
-   - `google-generativeai`, `groq`
-2) Set environment variables before starting the backend:
+   - `google-generativeai`
+2) Alternatively, set environment variables before starting the backend (not required if using `.env`):
 ```bash
-export LLM_PROVIDER=gemini           # or groq
-export GEMINI_API_KEY=...            # required if LLM_PROVIDER=gemini
-export GEMINI_MODEL=gemini-1.5-flash # optional
-
-export GROQ_API_KEY=...              # required if LLM_PROVIDER=groq
-export GROQ_MODEL=llama-3.1-70b-versatile  # optional
+export LLM_PROVIDER=gemini
+export GEMINI_API_KEY=...            # required when using Gemini
+export GEMINI_MODEL=gemini-2.5-flash # optional
 ```
-3) The add-in can still pass `provider: 'mock'|'gemini'|'groq'` in the request body; if omitted, the backend uses `LLM_PROVIDER`.
+3) The add-in can still pass `provider: 'mock'|'gemini'` in the request body; if omitted, the backend uses `LLM_PROVIDER`.
 
 Notes:
 - Responses are normalized to `{ summary, action_items, draft_reply_html }`.
 - Streaming is supported; tokens are sent as SSE `event: token`.
 - Keep API keys out of the frontend; set them as env vars for the backend process.
+
+#### Get a Gemini API key (Google AI Studio)
+- Go to [Google AI Studio – API keys](https://aistudio.google.com/app/apikey) and sign in.
+- Click “Create API key”, select or create a Google Cloud project, and copy the key.
+- Put it in `backend/.env` (do not commit). Example shown above.
+- Choose a model, e.g. `GEMINI_MODEL=gemini-2.5-flash` (fast) or `gemini-2.0-pro` (stronger). Keep `LLM_PROVIDER=gemini`.
+- Start the backend with HTTPS as above and verify in the add-in.
 
 ## Using Microsoft Graph / SharePoint (Azure configuration)
 
@@ -103,7 +125,7 @@ You only need Azure configuration if you want to call Microsoft Graph (e.g., sea
 
 ### A) Register an app in Entra ID (Azure AD)
 1. Go to Azure Portal → Entra ID → App registrations → New registration
-2. Name: AI Mail assistant (local)
+2. Name: AI Mail Assistant (local)
 3. Supported account types: Single tenant (recommended for dev)
 4. Redirect URI: Single-page application (SPA)
    - `https://localhost:3000/src/taskpane/taskpane.html`

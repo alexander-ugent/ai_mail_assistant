@@ -3,7 +3,20 @@
 const API_BASE_URL = "https://localhost:8000";
 
 function setStatus(msg) {
-  document.getElementById('status').textContent = msg || '';
+  const el = document.getElementById('status');
+  if (!el) return;
+  el.textContent = msg || '';
+  if (msg && String(msg).trim().length > 0) {
+    el.style.display = '';
+    const isError = String(msg).toLowerCase().startsWith('error');
+    if (isError) {
+      el.classList.add('error-message');
+    } else {
+      el.classList.remove('error-message');
+    }
+  } else {
+    el.style.display = 'none';
+  }
 }
 
 function setDiagnostics(text) {
@@ -20,6 +33,14 @@ function renderResults(data) {
     ul.appendChild(li);
   });
   document.getElementById('draft-reply').innerHTML = data.draft_reply_html || '';
+}
+
+function setIndicator(id, state) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('active', 'complete');
+  if (state === 'active') el.classList.add('active');
+  if (state === 'complete') el.classList.add('complete');
 }
 
 async function getCurrentEmail() {
@@ -45,14 +66,19 @@ async function getCurrentEmail() {
 async function processEmail() {
   try {
     setStatus('Processing...');
+    setIndicator('ind-read', 'active');
     const email = await getCurrentEmail();
+    setIndicator('ind-read', 'complete');
+    setIndicator('ind-processing', 'active');
     const resp = await fetch(`${API_BASE_URL}/api/v1/process_email_for_addin`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject: email.subject, body: email.body, provider: 'mock', enable_context: false })
+      body: JSON.stringify({ subject: email.subject, body: email.body, enable_context: false })
     });
     const data = await resp.json();
     renderResults(data);
+    setIndicator('ind-processing', 'complete');
+    setIndicator('ind-complete', 'complete');
     setStatus('Done');
   } catch (e) {
     setStatus('Error: ' + e.message);
@@ -62,16 +88,21 @@ async function processEmail() {
 async function processEmailStream() {
   try {
     setStatus('Processing (stream)...');
+    setIndicator('ind-read', 'active');
     const email = await getCurrentEmail();
+    setIndicator('ind-read', 'complete');
+    setIndicator('ind-processing', 'active');
     const resp = await fetch(`${API_BASE_URL}/api/v1/process_email_for_addin_stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject: email.subject, body: email.body, provider: 'mock', enable_context: false })
+      body: JSON.stringify({ subject: email.subject, body: email.body, enable_context: false })
     });
     const reader = resp.body.getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
     let draftBuffer = '';
+    setIndicator('ind-processing', 'complete');
+    setIndicator('ind-streaming', 'active');
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
@@ -89,6 +120,9 @@ async function processEmailStream() {
         }
         if (dataLine) {
           const payload = JSON.parse(dataLine);
+          if (eventType === 'status_update' && payload.message) {
+            setStatus(payload.message);
+          }
           if (eventType === 'token') {
             draftBuffer += payload.content;
             document.getElementById('draft-reply').textContent = draftBuffer;
@@ -98,6 +132,8 @@ async function processEmailStream() {
         }
       }
     }
+    setIndicator('ind-streaming', 'complete');
+    setIndicator('ind-complete', 'complete');
     setStatus('Done');
   } catch (e) {
     setStatus('Error: ' + e.message);
@@ -135,8 +171,7 @@ function updateDiagnostics() {
 
 Office.onReady(info => {
   if (info.host === Office.HostType.Outlook) {
-    document.getElementById('process-email').addEventListener('click', processEmail);
-    document.getElementById('process-email-stream').addEventListener('click', processEmailStream);
+    document.getElementById('process-email').addEventListener('click', processEmailStream);
     document.getElementById('insert-reply').addEventListener('click', insertReply);
     document.getElementById('test-connection').addEventListener('click', testConnection);
     updateDiagnostics();

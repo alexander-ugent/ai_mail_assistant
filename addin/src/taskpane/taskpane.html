@@ -4,37 +4,42 @@
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI Mail assistant</title>
+    <title>AI Mail Assistant</title>
     <link rel="stylesheet" href="taskpane.css" />
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   </head>
   <body>
-    <header>
-      <img src="../../assets/icon-32.png" alt="AI Mail assistant" />
-      <h1>AI Mail assistant</h1>
+    <header class="header">
+      <h1>AI Mail Assistant</h1>
     </header>
 
-    <section class="controls">
-      <button id="process-email">Process Email</button>
-      <button id="process-email-stream">Process Email (stream)</button>
-      <button id="insert-reply">Insert as Reply</button>
-      <button id="test-connection">Test Connection</button>
+    <section class="button-container controls-section">
+      <button id="process-email" class="ms-Button">Process Email</button>
+      <button id="insert-reply" class="ms-Button secondary">Insert as Reply</button>
+      <button id="test-connection" class="ms-Button secondary">Test Connection</button>
     </section>
 
-    <section id="status"></section>
+    <div id="status-indicators" class="status-indicators">
+      <span class="indicator" id="ind-read">Reading</span>
+      <span class="indicator" id="ind-processing">Processing</span>
+      <span class="indicator" id="ind-streaming">Streaming</span>
+      <span class="indicator" id="ind-complete">Done</span>
+    </div>
 
-    <section class="results">
-      <div class="card">
+    <section id="status" class="error-message" style="display: none;"></section>
+
+    <section class="results-container">
+      <div class="section summary-section">
         <h2>Summary</h2>
-        <div id="summary"></div>
+        <div id="summary" class="summary-text"></div>
       </div>
-      <div class="card">
+      <div class="section actions-section">
         <h2>Action Items</h2>
-        <ul id="action-items"></ul>
+        <ul id="action-items" class="action-items"></ul>
       </div>
-      <div class="card">
+      <div class="section response-section">
         <h2>Draft Reply</h2>
-        <div id="draft-reply"></div>
+        <div id="draft-reply" class="response-box"></div>
       </div>
     </section>
 
