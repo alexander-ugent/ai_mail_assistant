@@ -1,6 +1,6 @@
 # AI Mail Assistant
 
-Local-first Outlook add-in that processes emails using a mock LLM. No external keys required. You can later swap to a real LLM by extending the backend `services/llm.py` factory.
+Local-first Outlook add-in that processes emails using a Gemini LLM. See the External Providers section on how to acquire an API key.
 
 ## AI Mail Assistant – Local setup and sideload guide
 
